@@ -1,0 +1,18 @@
+{
+  "name": "webxr-webrtc-latency-benchmark",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lightweight prototype to evaluate real-time state sync for WebXR/3D over WebRTC DataChannels",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "ws": "^8.18.0"
+  }
+}
