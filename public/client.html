@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Client - WebXR WebRTC Latency Benchmark</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.164.1/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body class="page-client">
+    <div id="app">
+      <header class="hud">
+        <div class="hud-row">
+          <strong>Role:</strong> Client (XR Viewer)
+          <span id="mode" class="badge">Receive-only</span>
+        </div>
+        <div class="hud-row stats">
+          <span>WS: <span id="ws-state">-</span></span>
+          <span>PC: <span id="pc-state">-</span></span>
+          <span>DC: <span id="dc-state">-</span></span>
+          <span>Seq: <span id="seq">0</span></span>
+          <span>Recv: <span id="rate">0</span> Hz</span>
+          <span>Age: <span id="age">-</span> ms</span>
+        </div>
+        <div class="hud-row hint">Applies remote state from host (unordered/unreliable DataChannel).</div>
+      </header>
+      <canvas id="scene"></canvas>
+      <section class="log-panel">
+        <h2>Log</h2>
+        <pre id="log"></pre>
+      </section>
+    </div>
+    <script type="module" src="/js/client.js"></script>
+  </body>
+</html>

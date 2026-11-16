@@ -7,29 +7,28 @@
     <link rel="stylesheet" href="/css/style.css" />
   </head>
   <body>
-    <main>
+    <main class="landing">
       <h1>WebXR WebRTC Latency Benchmark</h1>
-      <p class="subtitle">Lightweight prototype for real-time state sync over WebRTC DataChannels.</p>
+      <p class="subtitle">Real-time state synchronization prototype over WebRTC DataChannels (unordered, unreliable).</p>
 
       <section class="panel">
-        <h2>Session</h2>
+        <h2>Roles</h2>
+        <p>Open each role in a separate tab or device on the same network.</p>
         <div class="controls">
-          <label for="role">Role</label>
-          <select id="role">
-            <option value="host">Host</option>
-            <option value="client">Client</option>
-          </select>
-          <button id="connect">Connect &amp; Register</button>
+          <a class="button-link" href="/host.html">Open Host (Edge Simulation Server)</a>
+          <a class="button-link secondary" href="/client.html">Open Client (XR Viewer)</a>
         </div>
-        <p id="status">Status: idle</p>
       </section>
 
       <section class="panel">
-        <h2>Log</h2>
-        <pre id="log" aria-live="polite"></pre>
+        <h2>Run</h2>
+        <ol>
+          <li>Start the signaling server: <code>npm start</code></li>
+          <li>Open <code>/host.html</code> and <code>/client.html</code></li>
+          <li>Peers auto-register and negotiate; host streams cube state at 60Hz</li>
+          <li>Host controls: <kbd>M</kbd> toggle Auto/Manual, arrow keys move in Manual mode</li>
+        </ol>
       </section>
     </main>
-
-    <script type="module" src="/js/app.js"></script>
   </body>
 </html>

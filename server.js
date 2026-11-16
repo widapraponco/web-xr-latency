@@ -94,6 +94,7 @@ function handleMessage(ws, raw) {
     case 'offer':
     case 'answer':
     case 'ice-candidate':
+    case 'ready':
       return relayToPeer(ws, msg);
     default:
       return safeSend(ws, { type: 'error', message: `Unknown message type: ${String(msg.type)}` });
