@@ -121,6 +121,9 @@ _Reporting suggestions:_ specify whether "Mean Latency" is RTT or one-way estima
 .
 ├─ server.js               # Express static hosting + WebSocket signaling relay
 ├─ package.json
+├─ results/
+|  ├─ test_3g_no_backpressure.csv
+|  └─ test_3g_with_backpressure.csv
 └─ public/
    ├─ index.html           # Landing page
    ├─ host.html            # Edge simulation host UI
@@ -145,9 +148,9 @@ _Reporting suggestions:_ specify whether "Mean Latency" is RTT or one-way estima
 To evaluate the impact of application-layer congestion control on real-time 3D state synchronization, two 30-second experiments were conducted over a throttled 3G profile using an unreliable WebRTC DataChannel (`ordered: false, maxRetransmits: 0`):
 
 1. **Test A (Unbounded Sending / No Backpressure):** The edge host pushes 60Hz state updates continuously regardless of socket queue buildup.
-2. **Test B (Backpressure-Aware Sending):** The edge host monitors `RTCDataChannel.bufferedAmount` and skips non-critical intermediate frames whenever the buffer exceeds `2048 bytes`.
+2. **Test B (Backpressure-Aware Sending):** The edge host monitors `RTCDataChannel.bufferedAmount` and skips non-critical intermediate frames whenever the buffer exceeds `1024 bytes`.
 
-| Metric                         | Test A: Unbounded (No Buffer Control) | Test B: Backpressure (`bufferedAmount <= 2048B`) |   Improvement    |
+| Metric                         | Test A: Unbounded (No Buffer Control) | Test B: Backpressure (`bufferedAmount <= 1024B`) |   Improvement    |
 | :----------------------------- | :-----------------------------------: | :----------------------------------------------: | :--------------: |
 | **Mean Round-Trip Time (RTT)** |              37,463.8 ms              |                  **4,084.1 ms**                  |    **-89.1%**    |
 | **RTT Range (Min – Max)**      |   29,322.2 – 47,309.6 ms (Drifting)   |        **4,011.1 – 4,663.4 ms (Bounded)**        | Drift Eliminated |
@@ -161,3 +164,4 @@ To evaluate the impact of application-layer congestion control on real-time 3D s
 
 - **Elimination of Progressive Latency Drift:** Without backpressure (Test A), queuing delay accumulated continuously (+18 seconds over 30 seconds). Enforcing a 2KB `bufferedAmount` threshold (Test B) bounded the RTT completely around the baseline network delay (~4.0s).
 - **Mitigation of Burst-and-Stall Behavior:** Test A exhibited severe traffic stalls (`0 Hz` reception) followed by massive bursts (`224 Hz`), whereas Test B smoothed packet arrival rates (peaking at `72 Hz`) and cut average jitter by **57.1%**.
+
