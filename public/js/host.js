@@ -8,6 +8,7 @@ const dcStateEl = $('dc-state');
 const seqEl = $('seq');
 const rateEl = $('rate');
 const modeEl = $('mode');
+const dropToggleBtn = $('drop-toggle');
 
 const { cube, render } = createScene($('scene'));
 const sim = createHostSimulation(cube, {
@@ -25,6 +26,13 @@ let sendCount = 0;
 let sendInterval = null;
 let rateInterval = null;
 let offerInFlight = false;
+let sendingPaused = false;
+
+function updateDropUi() {
+  if (!dropToggleBtn) return;
+  dropToggleBtn.textContent = sendingPaused ? 'Resume Sending' : 'Simulate Network Drop (Pause Sending)';
+  dropToggleBtn.classList.toggle('active-drop', sendingPaused);
+}
 
 function setWsState(s) { wsStateEl.textContent = typeof s === 'number' ? wsStateLabel(s) : String(s); }
 function setPcState() {
@@ -48,7 +56,7 @@ function startSendLoop() {
   if (sendInterval) return;
   sendInterval = setInterval(() => {
     sim.step(1 / 60);
-    if (dataChannel && dataChannel.readyState === 'open') {
+    if (!sendingPaused && dataChannel && dataChannel.readyState === 'open') {
       seq += 1;
       const state = sim.getState();
       const msg = {
@@ -91,7 +99,7 @@ async function startOffer() {
       onMessage: (ev) => {
         let msg;
         try { msg = JSON.parse(ev.data); } catch { return; }
-        if (msg && msg.type === 'ping' && typeof msg.t0 === 'number' && dataChannel && dataChannel.readyState === 'open') {
+        if (!sendingPaused && msg && msg.type === 'ping' && typeof msg.t0 === 'number' && dataChannel && dataChannel.readyState === 'open') {
           try { dataChannel.send(JSON.stringify({ type: 'pong', t0: msg.t0 })); } catch (e) { log(`Pong send error: ${e.message}`); }
         }
       },
@@ -158,6 +166,15 @@ rateInterval = setInterval(() => {
   rateEl.textContent = String(sendCount);
   sendCount = 0;
 }, 1000);
+
+if (dropToggleBtn) {
+  dropToggleBtn.addEventListener('click', () => {
+    sendingPaused = !sendingPaused;
+    updateDropUi();
+    log(sendingPaused ? 'Network drop simulated: pausing state sends and pongs' : 'Network drop cleared: resuming sends');
+  });
+}
+updateDropUi();
 
 function loop() {
   render();

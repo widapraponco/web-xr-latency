@@ -17,6 +17,7 @@ const fpsEl = $('fps');
 const modeLabelEl = $('mode-label');
 const modeToggleBtn = $('mode-toggle');
 const exportBtn = $('export-csv');
+const offlineBadgeEl = $('offline-badge');
 
 const { cube, render } = createScene($('scene'));
 
@@ -27,6 +28,7 @@ const HUD_INTERVAL_MS = 250;
 const RECORD_INTERVAL_MS = 250;
 const HISTORY_WINDOW_MS = 30000;
 const IA_WINDOW_MS = 2000;
+const WATCHDOG_MS = 500;
 
 // --- connection state ---
 let signaling = null;
@@ -34,6 +36,11 @@ let peer = null;
 let dataChannel = null;
 let pingInterval = null;
 let hudInterval = null;
+
+// --- watchdog ---
+let lastPacketTime = 0;
+let watchdogArmed = false;
+let watchdogLost = false;
 
 // --- render/mode state ---
 let mode = 'raw'; // 'raw' | 'interpolated'
@@ -130,6 +137,10 @@ function cleanupPeer(reason) {
   stopIntervals();
   if (dataChannel) { try { dataChannel.close(); } catch {} dataChannel = null; }
   if (peer) { peer.close(); peer = null; }
+  watchdogArmed = false;
+  watchdogLost = false;
+  lastPacketTime = 0;
+  if (offlineBadgeEl) offlineBadgeEl.hidden = true;
   resetLiveMetrics();
   setPcState();
   setDcState('closed');
@@ -211,6 +222,7 @@ function onDataChannelMessage(ev) {
     return;
   }
   if (!msg) return;
+  lastPacketTime = performance.now();
   if (msg.type === 'pong') {
     if (typeof msg.t0 === 'number') {
       const sample = performance.now() - msg.t0;
@@ -251,6 +263,21 @@ function updateInterpolated(now) {
     THREE.MathUtils.lerp(s0.ry, s1.ry, alpha),
     THREE.MathUtils.lerp(s0.rz, s1.rz, alpha)
   );
+}
+
+function updateWatchdog(now) {
+  if (!watchdogArmed) {
+    watchdogLost = false;
+    if (offlineBadgeEl) offlineBadgeEl.hidden = true;
+    return false;
+  }
+  const lost = (now - lastPacketTime) > WATCHDOG_MS;
+  if (lost !== watchdogLost) {
+    watchdogLost = lost;
+    if (offlineBadgeEl) offlineBadgeEl.hidden = !lost;
+    log(lost ? 'CONNECTION LOST / OFFLINE (no packets for 500ms)' : 'Connection recovered');
+  }
+  return lost;
 }
 
 function fmt(n, digits = 2) {
@@ -313,6 +340,10 @@ function attachDataChannel(dc) {
       setDcState('open');
       if (connBadgeEl) connBadgeEl.textContent = 'connected';
       log(`DataChannel open: ${dc.label}`);
+      watchdogArmed = true;
+      watchdogLost = false;
+      lastPacketTime = performance.now();
+      if (offlineBadgeEl) offlineBadgeEl.hidden = true;
       startHudAndPing();
     },
     onClose: () => { setDcState('closed'); log('DataChannel closed'); stopIntervals(); },
@@ -441,7 +472,10 @@ function loop() {
     fpsFrames = 0;
     fpsLastTime = now;
   }
-  updateInterpolated(now);
+  const lost = updateWatchdog(now);
+  if (!lost) {
+    updateInterpolated(now);
+  }
   maybeRecord(now);
   render();
   requestAnimationFrame(loop);
