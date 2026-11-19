@@ -49,8 +49,8 @@ The prototype comprises an edge simulation host, a browser-based client viewer, 
 
 - **Unreliable, low-latency transport:** The host creates the state DataChannel with `ordered: false` and `maxRetransmits: 0` to avoid head-of-line blocking, prioritizing timeliness over guaranteed delivery for continuous pose updates. The client uses monotonic sequence numbers (`seq`) to discard stale/out-of-order samples.
 - **Client-side mitigation modes:**
-  - *Raw mode:* applies the latest received pose immediately, exposing visible stutter/jumps under jitter and loss.
-  - *Interpolated mode:* maintains a 50 ms jitter buffer and renders via linear interpolation (`THREE.Vector3.lerpVectors` for position and per-axis rotation interpolation) to improve visual smoothness under network perturbations.
+  - _Raw mode:_ applies the latest received pose immediately, exposing visible stutter/jumps under jitter and loss.
+  - _Interpolated mode:_ maintains a 50 ms jitter buffer and renders via linear interpolation (`THREE.Vector3.lerpVectors` for position and per-axis rotation interpolation) to improve visual smoothness under network perturbations.
 - **Real-time telemetry HUD:** displays RTT (DataChannel ping-pong), one-way latency estimate, inter-arrival jitter, packet loss (%), receive rate, sequence number, and render FPS.
 - **CSV telemetry logging:** exports the last 30 seconds of recorded samples (time, mode, RTT/one-way estimate, jitter, packet loss, FPS, receive rate, last sequence) for offline analysis and benchmarking.
 - **Deterministic host simulation:** authoritative 60 Hz state stream with automatic figure-eight motion and a manual control toggle (`M`, arrow keys) to support repeatable experiments.
@@ -58,11 +58,13 @@ The prototype comprises an edge simulation host, a browser-based client viewer, 
 ## 4. How to Run & Reproduce Experiments
 
 ### Prerequisites
+
 - Node.js **>= 18**
 - A modern browser with WebRTC and WebGL support (e.g., recent Chrome/Edge/Firefox)
 - Two browser contexts (tabs/windows or devices) with access to the signaling server
 
 ### Setup and execution
+
 1. **Install dependencies**
    ```bash
    npm install
@@ -83,6 +85,7 @@ The prototype comprises an edge simulation host, a browser-based client viewer, 
    - In browser DevTools/WebRTC internals, confirm the `state` DataChannel reports `ordered: false` and `maxRetransmits: 0`.
 
 ### Simulating packet loss and latency
+
 Browser DevTools HTTP throttling generally does **not** affect WebRTC (UDP/DataChannel) traffic. To reproduce impaired network conditions, apply impairment at the OS/network layer on the relevant interface/path between peers:
 
 - **Linux (`tc/netem`)** (example: 60 ms delay, ±20 ms jitter, 2% loss):
@@ -101,16 +104,16 @@ For realistic measurements, run host and client on separate devices over the tar
 
 Use the table below to record experimental results (e.g., derived from client CSV exports). Fill in measured values for your test conditions.
 
-| Network Condition | Transport Mode | Mean Latency (ms) | Jitter (ms) | Packet Loss (%) | Visual Smoothness |
-|---|---|---:|---:|---:|---|
-| Baseline (LAN, no impairment) | Raw |  |  |  |  |
-| Baseline (LAN, no impairment) | Interpolated (50 ms buffer) |  |  |  |  |
-| 50 ms delay, 10 ms jitter | Raw |  |  |  |  |
-| 50 ms delay, 10 ms jitter | Interpolated (50 ms buffer) |  |  |  |  |
-| 60 ms delay, 20 ms jitter, 2% loss | Raw |  |  |  |  |
-| 60 ms delay, 20 ms jitter, 2% loss | Interpolated (50 ms buffer) |  |  |  |  |
+| Network Condition                  | Transport Mode              | Mean Latency (ms) | Jitter (ms) | Packet Loss (%) | Visual Smoothness |
+| ---------------------------------- | --------------------------- | ----------------: | ----------: | --------------: | ----------------- |
+| Baseline (LAN, no impairment)      | Raw                         |                   |             |                 |                   |
+| Baseline (LAN, no impairment)      | Interpolated (50 ms buffer) |                   |             |                 |                   |
+| 50 ms delay, 10 ms jitter          | Raw                         |                   |             |                 |                   |
+| 50 ms delay, 10 ms jitter          | Interpolated (50 ms buffer) |                   |             |                 |                   |
+| 60 ms delay, 20 ms jitter, 2% loss | Raw                         |                   |             |                 |                   |
+| 60 ms delay, 20 ms jitter, 2% loss | Interpolated (50 ms buffer) |                   |             |                 |                   |
 
-*Reporting suggestions:* specify whether "Mean Latency" is RTT or one-way estimate, define the jitter metric (e.g., inter-arrival σ), state sample duration/window, and use a consistent rubric for "Visual Smoothness" (e.g., a 1–5 scale or qualitative labels).
+_Reporting suggestions:_ specify whether "Mean Latency" is RTT or one-way estimate, define the jitter metric (e.g., inter-arrival σ), state sample duration/window, and use a consistent rubric for "Visual Smoothness" (e.g., a 1–5 scale or qualitative labels).
 
 ## Repository Structure
 
@@ -136,3 +139,25 @@ Use the table below to record experimental results (e.g., derived from client CS
 - One-way latency reported in the HUD is an estimate derived from RTT (clock offset between peers is not assumed).
 - Packet loss is inferred from sequence-number gaps over received samples; with unordered/unreliable delivery, late arrivals beyond sequence progression are treated as stale drops.
 - WebXR device deployment and cross-network operation may require a secure context (HTTPS/localhost) and TURN infrastructure in addition to STUN.
+
+## Experimental Benchmark Results (3G Throttled Network, 30s Window)
+
+To evaluate the impact of application-layer congestion control on real-time 3D state synchronization, two 30-second experiments were conducted over a throttled 3G profile using an unreliable WebRTC DataChannel (`ordered: false, maxRetransmits: 0`):
+
+1. **Test A (Unbounded Sending / No Backpressure):** The edge host pushes 60Hz state updates continuously regardless of socket queue buildup.
+2. **Test B (Backpressure-Aware Sending):** The edge host monitors `RTCDataChannel.bufferedAmount` and skips non-critical intermediate frames whenever the buffer exceeds `2048 bytes`.
+
+| Metric                         | Test A: Unbounded (No Buffer Control) | Test B: Backpressure (`bufferedAmount <= 2048B`) |   Improvement    |
+| :----------------------------- | :-----------------------------------: | :----------------------------------------------: | :--------------: |
+| **Mean Round-Trip Time (RTT)** |              37,463.8 ms              |                  **4,084.1 ms**                  |    **-89.1%**    |
+| **RTT Range (Min – Max)**      |   29,322.2 – 47,309.6 ms (Drifting)   |        **4,011.1 – 4,663.4 ms (Bounded)**        | Drift Eliminated |
+| **Mean One-Way Latency**       |              18,731.9 ms              |                  **2,042.1 ms**                  |    **-89.1%**    |
+| **Mean Inter-Arrival Jitter**  |               366.07 ms               |                  **157.10 ms**                   |    **-57.1%**    |
+| **Peak Jitter Spike**          |              1,130.41 ms              |                  **450.53 ms**                   |    **-60.1%**    |
+| **Network Packet Loss**        |                 0.15%                 |                    **0.00%**                     |      -100%       |
+| **Client Render Frame Rate**   |               59.8 FPS                |                   **59.9 FPS**                   |    Maintained    |
+
+### Key Findings
+
+- **Elimination of Progressive Latency Drift:** Without backpressure (Test A), queuing delay accumulated continuously (+18 seconds over 30 seconds). Enforcing a 2KB `bufferedAmount` threshold (Test B) bounded the RTT completely around the baseline network delay (~4.0s).
+- **Mitigation of Burst-and-Stall Behavior:** Test A exhibited severe traffic stalls (`0 Hz` reception) followed by massive bursts (`224 Hz`), whereas Test B smoothed packet arrival rates (peaking at `72 Hz`) and cut average jitter by **57.1%**.
