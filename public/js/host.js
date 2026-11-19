@@ -88,6 +88,13 @@ async function startOffer() {
       onOpen: () => { setDcState('open'); log('DataChannel open (ordered:false, maxRetransmits:0)'); startSendLoop(); },
       onClose: () => { setDcState('closed'); log('DataChannel closed'); },
       onError: () => { setDcState('error'); log('DataChannel error'); },
+      onMessage: (ev) => {
+        let msg;
+        try { msg = JSON.parse(ev.data); } catch { return; }
+        if (msg && msg.type === 'ping' && typeof msg.t0 === 'number' && dataChannel && dataChannel.readyState === 'open') {
+          try { dataChannel.send(JSON.stringify({ type: 'pong', t0: msg.t0 })); } catch (e) { log(`Pong send error: ${e.message}`); }
+        }
+      },
     });
     setDcState('connecting');
 
