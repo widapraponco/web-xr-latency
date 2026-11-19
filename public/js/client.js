@@ -1,25 +1,33 @@
-import * as THREE from 'three';
-import { $, createLogger, createSignaling, createPeerConnection, bindDataChannel, wsStateLabel, CHANNEL_LABEL } from './common.js';
-import { createScene } from './scene.js';
+import * as THREE from "three";
+import {
+  $,
+  createLogger,
+  createSignaling,
+  createPeerConnection,
+  bindDataChannel,
+  wsStateLabel,
+  CHANNEL_LABEL,
+} from "./common.js";
+import { createScene } from "./scene.js";
 
-const log = createLogger($('log'));
-const wsStateEl = $('ws-state');
-const pcStateEl = $('pc-state');
-const dcStateEl = $('dc-state');
-const connBadgeEl = $('conn-badge');
-const seqEl = $('seq');
-const rateEl = $('rate');
-const rttEl = $('rtt');
-const owEl = $('ow');
-const jitterEl = $('jitter');
-const lossEl = $('loss');
-const fpsEl = $('fps');
-const modeLabelEl = $('mode-label');
-const modeToggleBtn = $('mode-toggle');
-const exportBtn = $('export-csv');
-const offlineBadgeEl = $('offline-badge');
+const log = createLogger($("log"));
+const wsStateEl = $("ws-state");
+const pcStateEl = $("pc-state");
+const dcStateEl = $("dc-state");
+const connBadgeEl = $("conn-badge");
+const seqEl = $("seq");
+const rateEl = $("rate");
+const rttEl = $("rtt");
+const owEl = $("ow");
+const jitterEl = $("jitter");
+const lossEl = $("loss");
+const fpsEl = $("fps");
+const modeLabelEl = $("mode-label");
+const modeToggleBtn = $("mode-toggle");
+const exportBtn = $("export-csv");
+const offlineBadgeEl = $("offline-badge");
 
-const { cube, render } = createScene($('scene'));
+const { cube, render } = createScene($("scene"));
 
 // --- config ---
 const JITTER_BUFFER_MS = 50;
@@ -43,7 +51,7 @@ let watchdogArmed = false;
 let watchdogLost = false;
 
 // --- render/mode state ---
-let mode = 'raw'; // 'raw' | 'interpolated'
+let mode = "raw"; // 'raw' | 'interpolated'
 const stateBuffer = []; // { t, pos: THREE.Vector3, rx, ry, rz }
 let latestSample = null;
 
@@ -67,15 +75,20 @@ const startWallTime = Date.now();
 const startPerf = performance.now();
 
 function setWsState(s) {
-  wsStateEl.textContent = typeof s === 'number' ? wsStateLabel(s) : String(s);
+  wsStateEl.textContent = typeof s === "number" ? wsStateLabel(s) : String(s);
 }
 function setPcState() {
-  if (!peer) { pcStateEl.textContent = '-'; return; }
+  if (!peer) {
+    pcStateEl.textContent = "-";
+    return;
+  }
   const pc = peer.pc;
   pcStateEl.textContent = `${pc.connectionState}/${pc.iceConnectionState}`;
-  if (connBadgeEl) connBadgeEl.textContent = pc.connectionState || '-';
+  if (connBadgeEl) connBadgeEl.textContent = pc.connectionState || "-";
 }
-function setDcState(s) { dcStateEl.textContent = s || '-'; }
+function setDcState(s) {
+  dcStateEl.textContent = s || "-";
+}
 
 function pruneByTime(arr, now, windowMs) {
   const cutoff = now - windowMs;
@@ -111,8 +124,14 @@ function getLossPct(now) {
 }
 
 function stopIntervals() {
-  if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
-  if (hudInterval) { clearInterval(hudInterval); hudInterval = null; }
+  if (pingInterval) {
+    clearInterval(pingInterval);
+    pingInterval = null;
+  }
+  if (hudInterval) {
+    clearInterval(hudInterval);
+    hudInterval = null;
+  }
 }
 
 function resetLiveMetrics() {
@@ -125,43 +144,57 @@ function resetLiveMetrics() {
   rttMs = null;
   stateBuffer.length = 0;
   latestSample = null;
-  seqEl.textContent = '-';
-  rateEl.textContent = '0';
-  rttEl.textContent = '-';
-  owEl.textContent = '-';
-  jitterEl.textContent = '-';
-  lossEl.textContent = '0.00';
+  seqEl.textContent = "-";
+  rateEl.textContent = "0";
+  rttEl.textContent = "-";
+  owEl.textContent = "-";
+  jitterEl.textContent = "-";
+  lossEl.textContent = "0.00";
 }
 
 function cleanupPeer(reason) {
   stopIntervals();
-  if (dataChannel) { try { dataChannel.close(); } catch {} dataChannel = null; }
-  if (peer) { peer.close(); peer = null; }
+  if (dataChannel) {
+    try {
+      dataChannel.close();
+    } catch {}
+    dataChannel = null;
+  }
+  if (peer) {
+    peer.close();
+    peer = null;
+  }
   watchdogArmed = false;
   watchdogLost = false;
   lastPacketTime = 0;
   if (offlineBadgeEl) offlineBadgeEl.hidden = true;
   resetLiveMetrics();
   setPcState();
-  setDcState('closed');
+  setDcState("closed");
   if (reason) log(`Peer cleaned up: ${reason}`);
 }
 
 function sendPing() {
-  if (!dataChannel || dataChannel.readyState !== 'open') return;
+  if (!dataChannel || dataChannel.readyState !== "open") return;
   try {
-    dataChannel.send(JSON.stringify({ type: 'ping', t0: performance.now() }));
+    dataChannel.send(JSON.stringify({ type: "ping", t0: performance.now() }));
   } catch {}
 }
 
 function isValidState(msg) {
-  if (!msg || typeof msg.seq !== 'number') return false;
+  if (!msg || typeof msg.seq !== "number") return false;
   const p = msg.position;
   const r = msg.rotation;
-  if (!Array.isArray(p) || p.length !== 3 || !Array.isArray(r) || r.length !== 3) return false;
+  if (
+    !Array.isArray(p) ||
+    p.length !== 3 ||
+    !Array.isArray(r) ||
+    r.length !== 3
+  )
+    return false;
   for (let i = 0; i < 3; i++) {
-    if (typeof p[i] !== 'number' || !Number.isFinite(p[i])) return false;
-    if (typeof r[i] !== 'number' || !Number.isFinite(r[i])) return false;
+    if (typeof p[i] !== "number" || !Number.isFinite(p[i])) return false;
+    if (typeof r[i] !== "number" || !Number.isFinite(r[i])) return false;
   }
   return true;
 }
@@ -177,7 +210,8 @@ function pushSample(now, msg) {
   stateBuffer.push(sample);
   latestSample = sample;
   const cutoff = now - 2000;
-  while (stateBuffer.length > 2 && stateBuffer[0].t < cutoff) stateBuffer.shift();
+  while (stateBuffer.length > 2 /* && stateBuffer[0].t < cutoff*/)
+    stateBuffer.shift();
 }
 
 function applySample(sample) {
@@ -209,7 +243,7 @@ function handleStateMessage(msg) {
   seqEl.textContent = String(lastSeq);
 
   pushSample(now, msg);
-  if (mode === 'raw') {
+  if (mode === "raw") {
     applySample(latestSample);
   }
 }
@@ -223,20 +257,20 @@ function onDataChannelMessage(ev) {
   }
   if (!msg) return;
   lastPacketTime = performance.now();
-  if (msg.type === 'pong') {
-    if (typeof msg.t0 === 'number') {
+  if (msg.type === "pong") {
+    if (typeof msg.t0 === "number") {
       const sample = performance.now() - msg.t0;
       if (sample >= 0 && Number.isFinite(sample)) rttMs = sample;
     }
     return;
   }
-  if (typeof msg.seq === 'number') {
+  if (typeof msg.seq === "number") {
     handleStateMessage(msg);
   }
 }
 
 function updateInterpolated(now) {
-  if (mode !== 'interpolated') return;
+  if (mode !== "interpolated") return;
   if (stateBuffer.length === 0) return;
   const renderTime = now - JITTER_BUFFER_MS;
 
@@ -254,14 +288,18 @@ function updateInterpolated(now) {
   while (i > 0 && stateBuffer[i].t > renderTime) i--;
   const s0 = stateBuffer[i];
   const s1 = stateBuffer[i + 1];
-  if (!s0 || !s1) { applySample(last); return; }
+  if (!s0 || !s1) {
+    applySample(last);
+    return;
+  }
   const span = s1.t - s0.t;
-  const alpha = span > 0 ? Math.min(1, Math.max(0, (renderTime - s0.t) / span)) : 1;
+  const alpha =
+    span > 0 ? Math.min(1, Math.max(0, (renderTime - s0.t) / span)) : 1;
   cube.position.lerpVectors(s0.pos, s1.pos, alpha);
   cube.rotation.set(
     THREE.MathUtils.lerp(s0.rx, s1.rx, alpha),
     THREE.MathUtils.lerp(s0.ry, s1.ry, alpha),
-    THREE.MathUtils.lerp(s0.rz, s1.rz, alpha)
+    THREE.MathUtils.lerp(s0.rz, s1.rz, alpha),
   );
 }
 
@@ -271,17 +309,21 @@ function updateWatchdog(now) {
     if (offlineBadgeEl) offlineBadgeEl.hidden = true;
     return false;
   }
-  const lost = (now - lastPacketTime) > WATCHDOG_MS;
+  const lost = now - lastPacketTime > WATCHDOG_MS;
   if (lost !== watchdogLost) {
     watchdogLost = lost;
     if (offlineBadgeEl) offlineBadgeEl.hidden = !lost;
-    log(lost ? 'CONNECTION LOST / OFFLINE (no packets for 500ms)' : 'Connection recovered');
+    log(
+      lost
+        ? "CONNECTION LOST / OFFLINE (no packets for 500ms)"
+        : "Connection recovered",
+    );
   }
   return lost;
 }
 
 function fmt(n, digits = 2) {
-  return (typeof n === 'number' && Number.isFinite(n)) ? n.toFixed(digits) : '-';
+  return typeof n === "number" && Number.isFinite(n) ? n.toFixed(digits) : "-";
 }
 
 function recordSample(now) {
@@ -291,7 +333,7 @@ function recordSample(now) {
     wall: startWallTime + (now - startPerf),
     mode,
     rtt: rttMs,
-    ow: (typeof rttMs === 'number') ? rttMs / 2 : null,
+    ow: typeof rttMs === "number" ? rttMs / 2 : null,
     jitter: getJitterMs(now),
     loss: getLossPct(now),
     fps: fpsValue,
@@ -305,7 +347,7 @@ function updateHud(now) {
   recvCountWindow = 0;
   const jitter = getJitterMs(now);
   const loss = getLossPct(now);
-  const ow = (typeof rttMs === 'number') ? rttMs / 2 : null;
+  const ow = typeof rttMs === "number" ? rttMs / 2 : null;
 
   rttEl.textContent = fmt(rttMs, 2);
   owEl.textContent = fmt(ow, 2);
@@ -337,8 +379,8 @@ function attachDataChannel(dc) {
   dataChannel = dc;
   bindDataChannel(dc, {
     onOpen: () => {
-      setDcState('open');
-      if (connBadgeEl) connBadgeEl.textContent = 'connected';
+      setDcState("open");
+      if (connBadgeEl) connBadgeEl.textContent = "connected";
       log(`DataChannel open: ${dc.label}`);
       watchdogArmed = true;
       watchdogLost = false;
@@ -346,8 +388,15 @@ function attachDataChannel(dc) {
       if (offlineBadgeEl) offlineBadgeEl.hidden = true;
       startHudAndPing();
     },
-    onClose: () => { setDcState('closed'); log('DataChannel closed'); stopIntervals(); },
-    onError: () => { setDcState('error'); log('DataChannel error'); },
+    onClose: () => {
+      setDcState("closed");
+      log("DataChannel closed");
+      stopIntervals();
+    },
+    onError: () => {
+      setDcState("error");
+      log("DataChannel error");
+    },
     onMessage: onDataChannelMessage,
   });
   setDcState(dc.readyState);
@@ -357,7 +406,7 @@ async function handleOffer(msg) {
   cleanupPeer();
   try {
     peer = createPeerConnection({
-      onLocalIceCandidate: (c) => signaling.sendSignal('ice-candidate', c),
+      onLocalIceCandidate: (c) => signaling.sendSignal("ice-candidate", c),
       onPcState: setPcState,
       onLog: log,
     });
@@ -372,20 +421,20 @@ async function handleOffer(msg) {
     await peer.setRemoteDescription(msg.payload);
     const answer = await peer.pc.createAnswer();
     await peer.pc.setLocalDescription(answer);
-    signaling.sendSignal('answer', peer.pc.localDescription);
-    log('Received offer, sent answer');
+    signaling.sendSignal("answer", peer.pc.localDescription);
+    log("Received offer, sent answer");
   } catch (e) {
     log(`Failed handling offer: ${e.message}`);
-    cleanupPeer('offer handling failure');
+    cleanupPeer("offer handling failure");
   }
 }
 
 async function handleSignal(msg) {
   switch (msg.type) {
-    case 'offer':
+    case "offer":
       await handleOffer(msg);
       break;
-    case 'ice-candidate':
+    case "ice-candidate":
       if (peer) await peer.addIceCandidate(msg.payload);
       break;
     default:
@@ -393,39 +442,40 @@ async function handleSignal(msg) {
   }
 }
 
-signaling = createSignaling('client', {
+signaling = createSignaling("client", {
   onLog: log,
   onWsState: setWsState,
   onRegistered: (role) => log(`Registered as ${role}`),
   onPeerJoined: async (role) => {
     log(`Peer joined: ${role}`);
-    if (role === 'host') {
-      signaling.sendSignal('ready', null);
-      log('Sent ready signal to host');
+    if (role === "host") {
+      signaling.sendSignal("ready", null);
+      log("Sent ready signal to host");
     }
   },
   onPeerLeft: (role) => {
     log(`Peer left: ${role}`);
-    cleanupPeer('peer left');
+    cleanupPeer("peer left");
   },
   onSignal: handleSignal,
-  onClose: () => cleanupPeer('signaling closed'),
+  onClose: () => cleanupPeer("signaling closed"),
 });
 
 function setMode(next) {
   mode = next;
-  modeLabelEl.textContent = mode === 'raw' ? 'Raw' : 'Interpolated';
-  modeToggleBtn.textContent = mode === 'raw' ? 'Switch to Interpolated' : 'Switch to Raw';
+  modeLabelEl.textContent = mode === "raw" ? "Raw" : "Interpolated";
+  modeToggleBtn.textContent =
+    mode === "raw" ? "Switch to Interpolated" : "Switch to Raw";
   log(`Render mode: ${mode}`);
-  if (mode === 'raw' && latestSample) applySample(latestSample);
+  if (mode === "raw" && latestSample) applySample(latestSample);
 }
 
-modeToggleBtn.addEventListener('click', () => {
-  setMode(mode === 'raw' ? 'interpolated' : 'raw');
+modeToggleBtn.addEventListener("click", () => {
+  setMode(mode === "raw" ? "interpolated" : "raw");
 });
 
 function csvEscape(v) {
-  if (v == null || (typeof v === 'number' && !Number.isFinite(v))) return '';
+  if (v == null || (typeof v === "number" && !Number.isFinite(v))) return "";
   const s = String(v);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
@@ -433,35 +483,52 @@ function csvEscape(v) {
 function exportCsv() {
   const now = performance.now();
   pruneByTime(records, now, HISTORY_WINDOW_MS);
-  const header = ['time_iso', 'elapsed_ms', 'mode', 'rtt_ms', 'ow_est_ms', 'jitter_ms', 'loss_pct', 'fps', 'recv_hz', 'last_seq'];
-  const rows = [header.join(',')];
+  const header = [
+    "time_iso",
+    "elapsed_ms",
+    "mode",
+    "rtt_ms",
+    "ow_est_ms",
+    "jitter_ms",
+    "loss_pct",
+    "fps",
+    "recv_hz",
+    "last_seq",
+  ];
+  const rows = [header.join(",")];
   for (const r of records) {
-    rows.push([
-      new Date(r.wall).toISOString(),
-      (r.t - startPerf).toFixed(2),
-      r.mode,
-      typeof r.rtt === 'number' ? r.rtt.toFixed(3) : '',
-      typeof r.ow === 'number' ? r.ow.toFixed(3) : '',
-      typeof r.jitter === 'number' ? r.jitter.toFixed(3) : '',
-      typeof r.loss === 'number' ? r.loss.toFixed(3) : '',
-      typeof r.fps === 'number' ? r.fps.toFixed(1) : '',
-      typeof r.recvHz === 'number' ? r.recvHz.toFixed(2) : '',
-      r.seq ?? '',
-    ].map(csvEscape).join(','));
+    rows.push(
+      [
+        new Date(r.wall).toISOString(),
+        (r.t - startPerf).toFixed(2),
+        r.mode,
+        typeof r.rtt === "number" ? r.rtt.toFixed(3) : "",
+        typeof r.ow === "number" ? r.ow.toFixed(3) : "",
+        typeof r.jitter === "number" ? r.jitter.toFixed(3) : "",
+        typeof r.loss === "number" ? r.loss.toFixed(3) : "",
+        typeof r.fps === "number" ? r.fps.toFixed(1) : "",
+        typeof r.recvHz === "number" ? r.recvHz.toFixed(2) : "",
+        r.seq ?? "",
+      ]
+        .map(csvEscape)
+        .join(","),
+    );
   }
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
-  a.download = `benchmark-client-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  a.download = `benchmark-client-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  log(`Exported CSV (${records.length} samples, last ${HISTORY_WINDOW_MS / 1000}s)`);
+  log(
+    `Exported CSV (${records.length} samples, last ${HISTORY_WINDOW_MS / 1000}s)`,
+  );
 }
 
-exportBtn.addEventListener('click', exportCsv);
+exportBtn.addEventListener("click", exportCsv);
 
 function loop() {
   const now = performance.now();
@@ -482,9 +549,10 @@ function loop() {
 }
 
 setWsState(WebSocket.CONNECTING);
-setDcState('-');
-if (connBadgeEl) connBadgeEl.textContent = 'connecting';
-setMode('raw');
-log('Client starting (auto-register, auto-answer, telemetry + mitigation)');
+setDcState("-");
+if (connBadgeEl) connBadgeEl.textContent = "connecting";
+setMode("raw");
+log("Client starting (auto-register, auto-answer, telemetry + mitigation)");
 signaling.connect();
 loop();
+
